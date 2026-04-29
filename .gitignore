@@ -1,0 +1,19 @@
+# Large local datasets and generated cache files
+CMS_npy_simple/
+CMS_npy_cache/
+outputs/
+tmp_test_dir/
+.pytest_tmp/
+pytest-cache-files-*/
+
+# Python build and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local environment and OS files
+.venv/
+venv/
+.env
+Thumbs.db
+.DS_Store
