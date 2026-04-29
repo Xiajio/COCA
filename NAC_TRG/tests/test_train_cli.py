@@ -1,3 +1,5 @@
+import pytest
+
 from nac_trg.train import build_arg_parser, _validate_args
 
 
@@ -15,6 +17,10 @@ def test_train_cli_exposes_response_model_options():
             "--mask-as-input",
             "--balanced-sampler",
             "--augment",
+            "--cache-dir",
+            r"H:\COCA\NAC_TRG\cache",
+            "--rebuild-cache",
+            "--prepare-cache-only",
             "--selection-metric",
             "auroc",
         ]
@@ -26,5 +32,16 @@ def test_train_cli_exposes_response_model_options():
     assert args.mask_as_input is True
     assert args.balanced_sampler is True
     assert args.augment is True
+    assert str(args.cache_dir) == r"H:\COCA\NAC_TRG\cache"
+    assert args.rebuild_cache is True
+    assert args.prepare_cache_only is True
     assert args.selection_metric == "auroc"
     _validate_args(args)
+
+
+def test_prepare_cache_only_requires_cache_dir():
+    parser = build_arg_parser()
+    args = parser.parse_args(["--prepare-cache-only"])
+
+    with pytest.raises(SystemExit):
+        _validate_args(args)

@@ -8,9 +8,10 @@ import random
 from typing import Sequence
 
 import torch
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 from tqdm.auto import tqdm
 
+from .cache import CachedNACResponseDataset, prepare_cache
 from .dataset import NACResponseDataset, ROI_STATS_DIM
 from .losses import ordinal_prediction, response_loss
 from .metadata import ManifestRow, build_manifest, manifest_summary
@@ -361,6 +362,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ring-radius", type=int, default=7)
     parser.add_argument("--mask-as-input", action="store_true")
     parser.add_argument("--window", type=float, nargs=2, default=(-150.0, 250.0))
+    parser.add_argument("--cache-dir", type=Path, default=None)
+    parser.add_argument("--rebuild-cache", action="store_true")
+    parser.add_argument("--prepare-cache-only", action="store_true")
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--num-workers", type=int, default=2)
@@ -401,13 +405,58 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--noise-std must be >= 0")
     if args.lambda_ordinal < 0:
         raise SystemExit("--lambda-ordinal must be >= 0")
+    if args.prepare_cache_only and args.cache_dir is None:
+        raise SystemExit("--prepare-cache-only requires --cache-dir")
 
 
-def _make_dataset(args: argparse.Namespace, rows: Sequence[ManifestRow], *, training: bool, seed: int) -> NACResponseDataset:
+def _prepare_caches(args: argparse.Namespace, rows: Sequence[ManifestRow]) -> None:
+    if args.cache_dir is None:
+        return
+    crop_shapes = [args.train_crop_shape]
+    if args.train_crop_shape is not None:
+        crop_shapes.append(None)
+    for crop_shape in crop_shapes:
+        summary = prepare_cache(
+            rows,
+            cache_root=args.cache_dir,
+            target_shape=args.target_shape,
+            crop_shape=crop_shape,
+            tumor_centered_crop_prob=args.tumor_centered_crop_prob,
+            ring_radius=args.ring_radius,
+            window=tuple(args.window),
+            mask_as_input=args.mask_as_input,
+            rebuild=args.rebuild_cache,
+            seed=args.seed,
+            progress=args.progress,
+        )
+        print(
+            f"Cache ready: {summary['cache_dir']} "
+            f"written={summary['written']} skipped={summary['skipped']} total={summary['total']}"
+        )
+
+
+def _make_dataset(args: argparse.Namespace, rows: Sequence[ManifestRow], *, training: bool, seed: int) -> Dataset:
+    crop_shape = args.train_crop_shape if training else None
+    if args.cache_dir is not None:
+        return CachedNACResponseDataset(
+            rows,
+            cache_root=args.cache_dir,
+            target_shape=args.target_shape,
+            crop_shape=crop_shape,
+            tumor_centered_crop_prob=args.tumor_centered_crop_prob,
+            ring_radius=args.ring_radius,
+            window=tuple(args.window),
+            mask_as_input=args.mask_as_input,
+            augment=training and args.augment,
+            flip_prob=args.flip_prob,
+            intensity_jitter=args.intensity_jitter,
+            noise_std=args.noise_std,
+            seed=args.seed,
+        )
     return NACResponseDataset(
         rows,
         target_shape=args.target_shape,
-        crop_shape=args.train_crop_shape if training else None,
+        crop_shape=crop_shape,
         tumor_centered_crop_prob=args.tumor_centered_crop_prob,
         ring_radius=args.ring_radius,
         window=tuple(args.window),
@@ -594,6 +643,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     _write_manifest_csv(rows, args.output_dir / "manifest.csv")
     print(f"Manifest: {manifest_summary(rows)}")
+
+    if args.cache_dir is not None and not args.dry_run:
+        _prepare_caches(args, rows)
+        if args.prepare_cache_only:
+            return 0
 
     if args.cv_folds > 1:
         positives = sum(row.binary_label == 1 for row in rows)

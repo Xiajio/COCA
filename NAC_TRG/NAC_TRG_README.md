@@ -31,10 +31,27 @@ By default, rows with missing or shape-mismatched masks are skipped because this
 ## 5-Fold Training
 
 ```powershell
-& 'C:\Users\msi\.conda\envs\medicine\python.exe' -m nac_trg.train --data-root 'H:\COCA\CMS_npy_simple' --label-xlsx 'H:\COCA\label.xlsx' --output-dir 'H:\COCA\NAC_TRG\outputs\response_5fold' --cv-folds 5 --epochs 60 --batch-size 1 --num-workers 2 --target-shape 64,128,128 --train-crop-shape 96,192,192 --tumor-centered-crop-prob 1.0 --ring-radius 7 --balanced-sampler --augment --flip-prob 0.5 --intensity-jitter 0.08 --noise-std 0.02 --base-channels 16 --depth 3 --hidden-dim 64 --dropout 0.3 --lambda-ordinal 0.3 --selection-metric auroc --lr 3e-5 --device cuda
+& 'C:\Users\msi\.conda\envs\medicine\python.exe' -m nac_trg.train --data-root 'H:\COCA\CMS_npy_simple' --label-xlsx 'H:\COCA\label.xlsx' --output-dir 'H:\COCA\NAC_TRG\outputs\response_5fold_cached' --cache-dir 'H:\COCA\NAC_TRG\cache' --cv-folds 5 --epochs 60 --batch-size 1 --num-workers 2 --target-shape 64,128,128 --train-crop-shape 96,192,192 --tumor-centered-crop-prob 1.0 --ring-radius 7 --balanced-sampler --augment --flip-prob 0.5 --intensity-jitter 0.08 --noise-std 0.02 --base-channels 16 --depth 3 --hidden-dim 64 --dropout 0.3 --lambda-ordinal 0.3 --selection-metric auroc --lr 3e-5 --device cuda
 ```
 
 Add `--mask-as-input` for the stronger ablation where image, tumor mask, and peritumor ring are passed as 3 input channels.
+
+## Preprocessing Cache
+
+Add `--cache-dir` to precompute resized tensors, tumor masks, peritumor rings, and ROI statistics before training. The trainer writes two cache variants when `--train-crop-shape` is set:
+
+```text
+training: tumor-centered crop -> resize
+validation: full volume -> resize
+```
+
+Use `--prepare-cache-only` when you want to build the cache first and exit:
+
+```powershell
+& 'C:\Users\msi\.conda\envs\medicine\python.exe' -m nac_trg.train --data-root 'H:\COCA\CMS_npy_simple' --label-xlsx 'H:\COCA\label.xlsx' --output-dir 'H:\COCA\NAC_TRG\outputs\cache_prepare' --cache-dir 'H:\COCA\NAC_TRG\cache' --cv-folds 5 --target-shape 64,128,128 --train-crop-shape 96,192,192 --tumor-centered-crop-prob 1.0 --ring-radius 7 --prepare-cache-only --device cuda
+```
+
+Use `--rebuild-cache` if you change preprocessing settings and want to overwrite existing cached files.
 
 ## Outputs
 

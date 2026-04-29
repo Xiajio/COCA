@@ -2,6 +2,9 @@
 CMS_npy_simple/
 CMS_npy_cache/
 outputs/
+NAC_TRG/cache/
+NAC_TRG/cache_*/
+NAC_TRG/tmp_pytest/
 tmp_test_dir/
 .pytest_tmp/
 pytest-cache-files-*/
