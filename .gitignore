@@ -6,6 +6,12 @@ tmp_test_dir/
 .pytest_tmp/
 pytest-cache-files-*/
 
+# Local data previews and notes not meant for GitHub
+CMS_npy_simple_preview.png
+label.xlsx
+TRG_TRAINING.md
+weidaim.md
+
 # Python build and test artifacts
 __pycache__/
 *.py[cod]
